@@ -1,0 +1,16 @@
+# Environment
+.env
+.venv/
+
+# PDFs (likely contain sensitive content)
+docs/
+*.pdf
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+dist/
+build/
