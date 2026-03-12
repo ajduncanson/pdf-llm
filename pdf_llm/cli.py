@@ -149,7 +149,7 @@ def main():
                 except Exception as e:
                     print(f"[governance] Warning: logging failed — {e}")
 
-    except (FileNotFoundError, ValueError, ImportError) as e:
+    except (FileNotFoundError, ValueError, ImportError, RuntimeError) as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
 

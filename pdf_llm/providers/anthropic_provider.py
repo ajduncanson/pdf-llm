@@ -22,17 +22,33 @@ class AnthropicProvider(BaseProvider):
     def query_with_metadata(
         self, prompt: str, context: str, model: str = None
     ) -> Tuple[str, Dict[str, Any]]:
+        import anthropic
+
         model = model or self.default_model
-        response = self.client.messages.create(
-            model=model,
-            max_tokens=4096,
-            messages=[
-                {
-                    "role": "user",
-                    "content": f"Here are the documents:\n\n{context}\n\n{prompt}",
-                }
-            ],
-        )
+        try:
+            response = self.client.messages.create(
+                model=model,
+                max_tokens=4096,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": f"Here are the documents:\n\n{context}\n\n{prompt}",
+                    }
+                ],
+            )
+        except anthropic.AuthenticationError:
+            raise RuntimeError("Anthropic authentication failed — check your ANTHROPIC_API_KEY.")
+        except anthropic.RateLimitError as e:
+            raise RuntimeError(
+                f"Anthropic rate limit exceeded. Wait and retry, or check your plan.\nDetail: {e}"
+            )
+        except anthropic.BadRequestError as e:
+            raise RuntimeError(f"Anthropic rejected the request (bad request): {e}")
+        except anthropic.APIConnectionError as e:
+            raise RuntimeError(f"Could not connect to Anthropic API: {e}")
+        except anthropic.APIStatusError as e:
+            raise RuntimeError(f"Anthropic API error {e.status_code}: {e.message}")
+
         text = response.content[0].text
         metadata = {
             "model_id": response.model,

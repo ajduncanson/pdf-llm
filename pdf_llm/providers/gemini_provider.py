@@ -25,11 +25,37 @@ class GeminiProvider(BaseProvider):
     def query_with_metadata(
         self, prompt: str, context: str, model: str = None
     ) -> Tuple[str, Dict[str, Any]]:
+        try:
+            from google.api_core.exceptions import (
+                GoogleAPICallError,
+                InvalidArgument,
+                PermissionDenied,
+                ResourceExhausted,
+                ServiceUnavailable,
+            )
+        except ImportError:
+            GoogleAPICallError = InvalidArgument = PermissionDenied = Exception
+            ResourceExhausted = ServiceUnavailable = Exception
+
         model_name = model or self.default_model
         model_obj = self._genai.GenerativeModel(model_name)
-        response = model_obj.generate_content(
-            f"Here are the documents:\n\n{context}\n\n{prompt}"
-        )
+        try:
+            response = model_obj.generate_content(
+                f"Here are the documents:\n\n{context}\n\n{prompt}"
+            )
+        except PermissionDenied:
+            raise RuntimeError("Gemini authentication failed — check your GEMINI_API_KEY.")
+        except ResourceExhausted as e:
+            raise RuntimeError(
+                f"Gemini quota or rate limit exceeded. Check your usage in Google AI Studio.\nDetail: {e}"
+            )
+        except InvalidArgument as e:
+            raise RuntimeError(f"Gemini rejected the request (invalid argument): {e}")
+        except ServiceUnavailable as e:
+            raise RuntimeError(f"Gemini service unavailable: {e}")
+        except GoogleAPICallError as e:
+            raise RuntimeError(f"Gemini API error: {e}")
+
         text = response.text
         usage = response.usage_metadata
         prompt_tokens = getattr(usage, "prompt_token_count", None)
