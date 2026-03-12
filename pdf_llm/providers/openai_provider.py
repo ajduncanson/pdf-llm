@@ -1,4 +1,5 @@
 import os
+from typing import Any, Dict, Tuple
 
 from .base import BaseProvider
 
@@ -18,7 +19,9 @@ class OpenAIProvider(BaseProvider):
 
         self.client = OpenAI(api_key=api_key)
 
-    def query(self, prompt: str, context: str, model: str = None) -> str:
+    def query_with_metadata(
+        self, prompt: str, context: str, model: str = None
+    ) -> Tuple[str, Dict[str, Any]]:
         model = model or self.default_model
         response = self.client.chat.completions.create(
             model=model,
@@ -29,4 +32,11 @@ class OpenAIProvider(BaseProvider):
                 }
             ],
         )
-        return response.choices[0].message.content
+        text = response.choices[0].message.content
+        metadata = {
+            "model_id": response.model,
+            "prompt_tokens": response.usage.prompt_tokens,
+            "completion_tokens": response.usage.completion_tokens,
+            "total_tokens": response.usage.total_tokens,
+        }
+        return text, metadata

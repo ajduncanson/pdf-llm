@@ -1,5 +1,7 @@
 import argparse
 import sys
+import time
+from pathlib import Path
 
 from dotenv import load_dotenv
 
@@ -7,6 +9,26 @@ from .core import load_pdfs, check_context_length
 from .providers import PROVIDERS
 
 load_dotenv()
+
+GOVERNANCE_CONFIG_PATH = Path(__file__).parent.parent / "governance_config.yaml"
+
+
+def _load_governance_logger():
+    """Load config and return a GovernanceLogger, or None if unavailable."""
+    try:
+        import yaml
+        from .governance_logger import GovernanceLogger
+
+        if not GOVERNANCE_CONFIG_PATH.exists():
+            print("[governance] Warning: governance_config.yaml not found — logging disabled.")
+            return None
+
+        with open(GOVERNANCE_CONFIG_PATH) as f:
+            config = yaml.safe_load(f)
+        return GovernanceLogger(config)
+    except Exception as e:
+        print(f"[governance] Warning: could not initialise logger — {e}")
+        return None
 
 
 def parse_args():
@@ -18,6 +40,8 @@ examples:
   python main.py --pdf report.pdf --prompt "Summarize this document" --provider anthropic
   python main.py --pdf doc1.pdf doc2.pdf --prompt "Compare these documents" --provider openai
   python main.py --pdf paper.pdf --prompt "What are the key findings?" --provider gemini --model gemini-1.5-flash
+  python main.py --pdf report.pdf --prompt "Key risks?" --provider anthropic --rag
+  python main.py --pdf report.pdf --prompt "Key risks?" --provider openai --rag --chunk-size 300 --top-k 8
         """,
     )
     parser.add_argument(
@@ -36,29 +60,100 @@ examples:
         "--model", default=None,
         help="Specific model to use (overrides the provider default)",
     )
+    parser.add_argument(
+        "--rag", action="store_true",
+        help="Use RAG pipeline (chunk, embed, retrieve) instead of sending full text",
+    )
+    parser.add_argument(
+        "--chunk-size", type=int, default=500, metavar="N",
+        help="Words per chunk when using --rag (default: 500)",
+    )
+    parser.add_argument(
+        "--top-k", type=int, default=5, metavar="N",
+        help="Number of chunks to retrieve when using --rag (default: 5)",
+    )
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
+    logger = _load_governance_logger()
 
-    print(f"Loading {len(args.pdf)} PDF(s)...")
     try:
-        context = load_pdfs(args.pdf)
-    except (FileNotFoundError, ValueError) as e:
+        if args.rag:
+            from .rag import run_rag
+            response, trace_id = run_rag(
+                pdf_paths=args.pdf,
+                prompt=args.prompt,
+                provider_name=args.provider,
+                model=args.model,
+                chunk_size=args.chunk_size,
+                top_k=args.top_k,
+                logger=logger,
+            )
+        else:
+            pipeline_start = time.monotonic()
+
+            print(f"Loading {len(args.pdf)} PDF(s)...")
+            context = load_pdfs(args.pdf)
+            context = check_context_length(context, args.provider)
+
+            model_label = args.model or "default model"
+            print(f"Querying {args.provider} ({model_label})...")
+
+            llm_start = time.monotonic()
+            provider = PROVIDERS[args.provider]()
+            response, llm_meta = provider.query_with_metadata(args.prompt, context, args.model)
+            llm_ms = int((time.monotonic() - llm_start) * 1000)
+            total_ms = int((time.monotonic() - pipeline_start) * 1000)
+            trace_id = None
+
+            if logger:
+                try:
+                    from pathlib import Path as _Path
+                    from pypdf import PdfReader
+                    source_docs = []
+                    for path in args.pdf:
+                        p = _Path(path)
+                        try:
+                            page_count = len(PdfReader(str(p)).pages)
+                        except Exception:
+                            page_count = None
+                        source_docs.append({
+                            "filename": p.name,
+                            "sha256_hash": logger.compute_document_hash(str(p)),
+                            "page_count": page_count,
+                            "ingestion_timestamp": None,
+                        })
+                    entry = logger.build_log_entry(
+                        prompt=args.prompt,
+                        source_documents=source_docs,
+                    )
+                    trace_id = entry["trace_id"]
+                    model_id = llm_meta.get("model_id") or args.model or provider.default_model
+                    entry["provider"] = args.provider
+                    entry["model_id"] = model_id
+                    entry["max_tokens"] = 4096
+                    entry["prompt_tokens_used"] = llm_meta.get("prompt_tokens")
+                    entry["completion_tokens_used"] = llm_meta.get("completion_tokens")
+                    entry["total_tokens_used"] = llm_meta.get("total_tokens")
+                    entry["llm_latency_ms"] = llm_ms
+                    entry["total_latency_ms"] = total_ms
+                    if llm_meta.get("total_tokens"):
+                        entry["estimated_cost_usd"] = logger._estimate_cost(
+                            model_id, llm_meta["total_tokens"]
+                        )
+                    logger.populate_response_fields(entry, response, model_id)
+                    entry = logger.check_flags(entry)
+                    logger.write(entry)
+                except Exception as e:
+                    print(f"[governance] Warning: logging failed — {e}")
+
+    except (FileNotFoundError, ValueError, ImportError) as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
 
-    context = check_context_length(context, args.provider)
-
-    model_label = args.model or "default model"
-    print(f"Querying {args.provider} ({model_label})...")
-    try:
-        provider = PROVIDERS[args.provider]()
-        response = provider.query(args.prompt, context, args.model)
-    except (ValueError, ImportError) as e:
-        print(f"Error: {e}", file=sys.stderr)
-        sys.exit(1)
-
+    if trace_id:
+        print(f"\n[trace_id: {trace_id}]")
     print("\n" + "=" * 60)
     print(response)

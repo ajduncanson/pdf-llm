@@ -1,4 +1,5 @@
 import os
+from typing import Any, Dict, Tuple
 
 from .base import BaseProvider
 
@@ -18,7 +19,9 @@ class AnthropicProvider(BaseProvider):
 
         self.client = anthropic.Anthropic(api_key=api_key)
 
-    def query(self, prompt: str, context: str, model: str = None) -> str:
+    def query_with_metadata(
+        self, prompt: str, context: str, model: str = None
+    ) -> Tuple[str, Dict[str, Any]]:
         model = model or self.default_model
         response = self.client.messages.create(
             model=model,
@@ -30,4 +33,11 @@ class AnthropicProvider(BaseProvider):
                 }
             ],
         )
-        return response.content[0].text
+        text = response.content[0].text
+        metadata = {
+            "model_id": response.model,
+            "prompt_tokens": response.usage.input_tokens,
+            "completion_tokens": response.usage.output_tokens,
+            "total_tokens": response.usage.input_tokens + response.usage.output_tokens,
+        }
+        return text, metadata

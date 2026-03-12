@@ -1,0 +1,26 @@
+environment: dev
+pipeline_version: "1.0.0"
+data_classification: internal
+retention_policy_days: 365
+jurisdiction: AU
+
+logging:
+  log_dir: ./logs
+
+thresholds:
+  hallucination_score_max: 0.3
+  faithfulness_score_min: 0.6
+  answer_relevance_score_min: 0.6
+  toxicity_score_max: 0.05
+  top_chunk_similarity_min: 0.5
+  total_latency_ms_max: 10000
+
+cost_per_million_tokens:
+  # Input / output averaged — update as pricing changes
+  claude-sonnet-4-20250514: 9.00
+  claude-opus-4-6: 75.00
+  claude-haiku-4-5: 0.80
+  gpt-4o: 10.00
+  gpt-4o-mini: 0.30
+  gemini-1.5-pro: 7.00
+  gemini-1.5-flash: 0.30

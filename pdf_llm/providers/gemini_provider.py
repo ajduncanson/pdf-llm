@@ -1,4 +1,5 @@
 import os
+from typing import Any, Dict, Tuple
 
 from .base import BaseProvider
 
@@ -21,10 +22,23 @@ class GeminiProvider(BaseProvider):
         genai.configure(api_key=api_key)
         self._genai = genai
 
-    def query(self, prompt: str, context: str, model: str = None) -> str:
+    def query_with_metadata(
+        self, prompt: str, context: str, model: str = None
+    ) -> Tuple[str, Dict[str, Any]]:
         model_name = model or self.default_model
-        model = self._genai.GenerativeModel(model_name)
-        response = model.generate_content(
+        model_obj = self._genai.GenerativeModel(model_name)
+        response = model_obj.generate_content(
             f"Here are the documents:\n\n{context}\n\n{prompt}"
         )
-        return response.text
+        text = response.text
+        usage = response.usage_metadata
+        prompt_tokens = getattr(usage, "prompt_token_count", None)
+        completion_tokens = getattr(usage, "candidates_token_count", None)
+        total_tokens = getattr(usage, "total_token_count", None)
+        metadata = {
+            "model_id": model_name,
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "total_tokens": total_tokens,
+        }
+        return text, metadata
