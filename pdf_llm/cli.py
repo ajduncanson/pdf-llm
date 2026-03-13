@@ -58,7 +58,7 @@ examples:
   python main.py --pdf report.pdf --prompt "Summarize this document" --provider anthropic
   python main.py --pdf doc1.pdf doc2.pdf --prompt "Compare these documents" --provider openai
   python main.py --pdf paper.pdf --prompt "What are the key findings?" --provider gemini --model gemini-1.5-flash
-  python main.py --pdf report.pdf --prompt "Key risks?" --provider anthropic --rag
+  python main.py --pdf report.pdf --prompt "Key risks?" --provider openai --rag
   python main.py --pdf report.pdf --prompt "Key risks?" --provider openai --rag --chunk-size 300 --top-k 8
         """,
     )
@@ -95,6 +95,16 @@ examples:
 
 def main():
     args = parse_args()
+
+    if args.rag and args.provider == "anthropic":
+        print(
+            "Error: --rag is not supported with --provider anthropic.\n"
+            "Use --provider openai or --provider gemini for RAG, or use\n"
+            "--provider anthropic without --rag for full-context mode.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     logger = _load_governance_logger()
 
     try:

@@ -1,0 +1,26 @@
+# Virtual environment — never copy into the image
+.venv/
+
+# Secrets
+.env
+
+# Runtime data — mounted as volumes at run time
+logs/
+docs/
+
+# ChromaDB persistent store (if any)
+chroma_store/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+*.swp

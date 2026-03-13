@@ -80,6 +80,9 @@ def get_embedder(provider: str) -> BaseEmbedder:
     elif provider == "gemini":
         return GeminiEmbedder()
     elif provider == "anthropic":
-        return LocalEmbedder()
+        raise ValueError(
+            "RAG is not supported with the anthropic provider. "
+            "Use --provider openai or --provider gemini for RAG."
+        )
     else:
         raise ValueError(f"Unknown provider: {provider}")

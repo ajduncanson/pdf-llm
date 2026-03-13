@@ -6,6 +6,9 @@
 docs/
 *.pdf
 
+# Governance logs (may contain sensitive prompts and responses)
+logs/
+
 # Python
 __pycache__/
 *.pyc

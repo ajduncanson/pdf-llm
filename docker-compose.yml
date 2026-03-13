@@ -1,0 +1,9 @@
+services:
+  pdf-llm:
+    build: .
+    env_file: .env
+    volumes:
+      - ./docs:/app/docs
+      - ./logs:/app/logs
+    # Pass arguments after the service name:
+    #   docker compose run --rm pdf-llm --pdf docs/report.pdf --prompt "..." --provider anthropic
