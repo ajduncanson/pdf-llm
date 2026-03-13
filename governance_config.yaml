@@ -15,6 +15,16 @@ thresholds:
   top_chunk_similarity_min: 0.5
   total_latency_ms_max: 10000
 
+scoring:
+  enabled: true                 # set true to enable deferred RAGAS scoring via score_logs.py
+  evaluator_provider: anthropic  # which provider's LLM judges quality (openai | anthropic | gemini)
+  evaluator_model: claude-haiku-4-5  # cheap and fast for evaluation
+  metrics:
+    - faithfulness               # are claims grounded in retrieved context?
+    - answer_relevancy           # is the answer relevant to the prompt?
+    # - context_precision        # requires ground-truth reference — disabled by default
+    # - context_recall           # requires ground-truth reference — disabled by default
+
 cost_per_million_tokens:
   # Input / output averaged — update as pricing changes
   claude-sonnet-4-20250514: 9.00

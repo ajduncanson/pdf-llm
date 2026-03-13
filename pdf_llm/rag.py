@@ -17,9 +17,9 @@ def run_rag(
     prompt: str,
     provider_name: str,
     model: str = None,
-    chunk_size: int = 500,
+    chunk_size: int = 300,
     overlap: int = 50,
-    top_k: int = 5,
+    top_k: int = 10,
     logger: Optional["GovernanceLogger"] = None,
     session_id: Optional[str] = None,
 ) -> Tuple[str, Optional[str]]:
@@ -115,6 +115,7 @@ def run_rag(
                     "similarity_score": round(sim, 4),
                     "rank_position": i + 1,
                     "chunk_text_preview": chunk[:120],
+                    "chunk_text": chunk,  # full text retained for deferred RAGAS scoring
                 }
                 for i, (chunk, sim) in enumerate(zip(relevant_chunks, similarities))
             ]
@@ -141,7 +142,23 @@ def run_rag(
 
     llm_start = time.monotonic()
     provider = PROVIDERS[provider_name]()
-    response_text, llm_meta = provider.query_with_metadata(prompt, context, model)
+    try:
+        response_text, llm_meta = provider.query_with_metadata(prompt, context, model)
+    except RuntimeError as e:
+        total_ms = int((time.monotonic() - pipeline_start) * 1000)
+        if logger and entry:
+            try:
+                entry["pipeline_status"] = "failed"
+                entry["error"] = str(e)
+                entry["provider"] = provider_name
+                entry["model_id"] = model or provider.default_model
+                entry["total_latency_ms"] = total_ms
+                entry["flagged_for_review"] = True
+                entry["flag_reasons"] = [f"API error: {e}"]
+                logger.write(entry)
+            except Exception as log_err:
+                print(f"[governance] Warning: failed to log error entry — {log_err}")
+        raise
     llm_ms = int((time.monotonic() - llm_start) * 1000)
     total_ms = int((time.monotonic() - pipeline_start) * 1000)
 

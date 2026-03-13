@@ -71,6 +71,9 @@ class GovernanceLogger:
             "estimated_cost_usd": None,
             "llm_latency_ms": None,
             "total_latency_ms": None,
+            # Pipeline status
+            "pipeline_status": "success",
+            "error": None,
             # Output
             "response_text": None,
             "response_token_count": None,

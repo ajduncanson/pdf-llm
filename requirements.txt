@@ -8,3 +8,7 @@ sentence-transformers>=2.0.0
 pyyaml>=6.0
 # langdetect is optional — adds language detection to governance logs
 # Not installed by default; install manually: pip install langdetect
+#
+# ragas is optional — required only for deferred quality scoring (score_logs.py)
+# Heavy dependency (~20 transitive packages incl. langchain, datasets, tiktoken)
+# Not installed by default; install manually: pip install ragas

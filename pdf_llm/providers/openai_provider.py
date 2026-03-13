@@ -5,7 +5,7 @@ from .base import BaseProvider
 
 
 class OpenAIProvider(BaseProvider):
-    default_model = "gpt-4o"
+    default_model = "gpt-5-mini-2025-08-07"
 
     def __init__(self):
         try:

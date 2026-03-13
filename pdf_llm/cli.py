@@ -31,6 +31,24 @@ def _load_governance_logger():
         return None
 
 
+def _build_source_docs(pdf_paths, logger):
+    from pypdf import PdfReader
+    source_docs = []
+    for path in pdf_paths:
+        p = Path(path)
+        try:
+            page_count = len(PdfReader(str(p)).pages)
+        except Exception:
+            page_count = None
+        source_docs.append({
+            "filename": p.name,
+            "sha256_hash": logger.compute_document_hash(str(p)),
+            "page_count": page_count,
+            "ingestion_timestamp": None,
+        })
+    return source_docs
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Query PDF documents using an LLM",
@@ -98,42 +116,51 @@ def main():
             context = load_pdfs(args.pdf)
             context = check_context_length(context, args.provider)
 
-            model_label = args.model or "default model"
-            print(f"Querying {args.provider} ({model_label})...")
-
-            llm_start = time.monotonic()
-            provider = PROVIDERS[args.provider]()
-            response, llm_meta = provider.query_with_metadata(args.prompt, context, args.model)
-            llm_ms = int((time.monotonic() - llm_start) * 1000)
-            total_ms = int((time.monotonic() - pipeline_start) * 1000)
+            # Build log entry before the LLM call so it exists on failure
+            entry = None
             trace_id = None
-
+            provider = PROVIDERS[args.provider]()
             if logger:
                 try:
-                    from pathlib import Path as _Path
-                    from pypdf import PdfReader
-                    source_docs = []
-                    for path in args.pdf:
-                        p = _Path(path)
-                        try:
-                            page_count = len(PdfReader(str(p)).pages)
-                        except Exception:
-                            page_count = None
-                        source_docs.append({
-                            "filename": p.name,
-                            "sha256_hash": logger.compute_document_hash(str(p)),
-                            "page_count": page_count,
-                            "ingestion_timestamp": None,
-                        })
+                    source_docs = _build_source_docs(args.pdf, logger)
                     entry = logger.build_log_entry(
                         prompt=args.prompt,
                         source_documents=source_docs,
                     )
                     trace_id = entry["trace_id"]
-                    model_id = llm_meta.get("model_id") or args.model or provider.default_model
                     entry["provider"] = args.provider
-                    entry["model_id"] = model_id
+                    entry["model_id"] = args.model or provider.default_model
                     entry["max_tokens"] = 4096
+                except Exception as e:
+                    print(f"[governance] Warning: failed to build log entry — {e}")
+
+            model_label = args.model or "default model"
+            print(f"Querying {args.provider} ({model_label})...")
+
+            llm_start = time.monotonic()
+            try:
+                response, llm_meta = provider.query_with_metadata(args.prompt, context, args.model)
+            except RuntimeError as e:
+                total_ms = int((time.monotonic() - pipeline_start) * 1000)
+                if logger and entry:
+                    try:
+                        entry["pipeline_status"] = "failed"
+                        entry["error"] = str(e)
+                        entry["total_latency_ms"] = total_ms
+                        entry["flagged_for_review"] = True
+                        entry["flag_reasons"] = [f"API error: {e}"]
+                        logger.write(entry)
+                    except Exception as log_err:
+                        print(f"[governance] Warning: failed to log error entry — {log_err}")
+                raise
+
+            llm_ms = int((time.monotonic() - llm_start) * 1000)
+            total_ms = int((time.monotonic() - pipeline_start) * 1000)
+
+            if logger and entry:
+                try:
+                    model_id = llm_meta.get("model_id") or args.model or provider.default_model
+                    entry["model_id"] = model_id
                     entry["prompt_tokens_used"] = llm_meta.get("prompt_tokens")
                     entry["completion_tokens_used"] = llm_meta.get("completion_tokens")
                     entry["total_tokens_used"] = llm_meta.get("total_tokens")
