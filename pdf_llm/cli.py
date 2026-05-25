@@ -63,8 +63,12 @@ examples:
         """,
     )
     parser.add_argument(
-        "--pdf", nargs="+", required=True, metavar="FILE",
+        "--pdf", nargs="+", metavar="FILE",
         help="One or more PDF files to process",
+    )
+    parser.add_argument(
+        "--pdf-dir", metavar="DIR",
+        help="Directory — process all *.pdf files found directly inside it",
     )
     parser.add_argument(
         "--prompt", required=True,
@@ -95,6 +99,21 @@ examples:
 
 def main():
     args = parse_args()
+
+    if bool(args.pdf) == bool(args.pdf_dir):
+        print("Error: provide exactly one of --pdf or --pdf-dir.", file=sys.stderr)
+        sys.exit(1)
+
+    if args.pdf_dir:
+        pdf_dir = Path(args.pdf_dir)
+        if not pdf_dir.is_dir():
+            print(f"Error: {pdf_dir} is not a directory.", file=sys.stderr)
+            sys.exit(1)
+        args.pdf = sorted(str(p) for p in pdf_dir.glob("*.pdf"))
+        if not args.pdf:
+            print(f"Error: no PDF files found in {pdf_dir}.", file=sys.stderr)
+            sys.exit(1)
+        print(f"Found {len(args.pdf)} PDF(s) in {pdf_dir}")
 
     if args.rag and args.provider == "anthropic":
         print(

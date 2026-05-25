@@ -74,7 +74,11 @@ This only needs to be re-run when you change `requirements.txt` or the applicati
 The general form of the command is:
 
 ```bash
+# single or multiple named files
 docker compose run --rm pdf-llm --pdf docs/<filename>.pdf --prompt "<your question>" --provider <provider>
+
+# all PDFs in a directory
+docker compose run --rm pdf-llm --pdf-dir docs/ --prompt "<your question>" --provider <provider>
 ```
 
 The `docker-compose.yml` file handles the boilerplate — volumes and env file are configured once so you don't repeat them on every command:
