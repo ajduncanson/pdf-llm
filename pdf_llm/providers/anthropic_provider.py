@@ -5,7 +5,7 @@ from .base import BaseProvider
 
 
 class AnthropicProvider(BaseProvider):
-    default_model = "claude-sonnet-4-20250514"
+    default_model = "claude-opus-4-8"
 
     def __init__(self):
         try:
