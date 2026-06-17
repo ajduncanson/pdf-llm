@@ -23,7 +23,7 @@ class GeminiProvider(BaseProvider):
         self._genai = genai
 
     def query_with_metadata(
-        self, prompt: str, context: str, model: str = None
+        self, prompt: str, context: str, model: str = None, system_prompt: str = None
     ) -> Tuple[str, Dict[str, Any]]:
         try:
             from google.api_core.exceptions import (
@@ -38,7 +38,10 @@ class GeminiProvider(BaseProvider):
             ResourceExhausted = ServiceUnavailable = Exception
 
         model_name = model or self.default_model
-        model_obj = self._genai.GenerativeModel(model_name)
+        model_obj = self._genai.GenerativeModel(
+            model_name,
+            system_instruction=system_prompt or "",
+        )
         try:
             response = model_obj.generate_content(
                 f"Here are the documents:\n\n{context}\n\n{prompt}"
@@ -50,6 +53,12 @@ class GeminiProvider(BaseProvider):
                 f"Gemini quota or rate limit exceeded. Check your usage in Google AI Studio.\nDetail: {e}"
             )
         except InvalidArgument as e:
+            msg = str(e).lower()
+            if "not found" in msg or "does not exist" in msg or "model" in msg and "invalid" in msg:
+                raise RuntimeError(
+                    f"Model '{model_name}' was not found — it may have been retired or the ID is incorrect.\n"
+                    f"Common models: gemini-2.0-flash, gemini-1.5-pro, gemini-1.5-flash"
+                )
             raise RuntimeError(f"Gemini rejected the request (invalid argument): {e}")
         except ServiceUnavailable as e:
             raise RuntimeError(f"Gemini service unavailable: {e}")

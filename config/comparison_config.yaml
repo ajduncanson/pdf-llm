@@ -1,0 +1,64 @@
+# Pipeline config for insurance PDS comparison
+#
+# Usage:
+#   python main.py --pdf-dir ./docs --prompt "Compare these policies" \
+#                  --provider anthropic --pipeline-config comparison_config.yaml
+
+# (i) Feature priorities — drives row ordering and analytical weight.
+#     priority: high | medium | low
+#     note: optional extra guidance for ambiguous features
+feature_priorities:
+  - name: "Excess / Deductible"
+    priority: high
+  - name: "Hospital Cover"
+    priority: high
+    note: "Note whether public vs. private hospital is covered and at what level"
+  - name: "Ambulance Cover"
+    priority: high
+  - name: "Dental (general)"
+    priority: medium
+  - name: "Dental (major)"
+    priority: medium
+  - name: "Optical"
+    priority: medium
+  - name: "Physiotherapy"
+    priority: medium
+  - name: "Psychology / Mental Health"
+    priority: medium
+  - name: "Waiting Periods"
+    priority: high
+    note: "List waiting periods per major benefit category if stated"
+  - name: "Overseas Emergency Cover"
+    priority: low
+  - name: "Pregnancy / Obstetrics"
+    priority: low
+
+# (ii) How to handle products with optional tiers or complex structures.
+comparison_rules:
+  # expand: each optional tier becomes its own row
+  # summarise: one row with a brief note about available tiers
+  tier_handling: expand
+
+  # mark_na: show N/A if a feature isn't mentioned
+  # omit: skip the row if the feature is absent from all products
+  # flag_for_review: mark ambiguous/absent features for human review
+  missing_feature: mark_na
+
+  # Any additional rules passed verbatim as instructions
+  extra:
+    - "If a benefit has a sub-limit (e.g. $300/year for optical), include the dollar amount in the cell."
+    - "Where terms differ significantly between products, add a brief note rather than a bare value."
+
+# (iii) Output format and structure.
+output:
+  # markdown | csv | json | html
+  format: markdown
+
+  # Show high-priority features before medium, then low
+  group_by_priority: true
+
+  # Mark the best product per feature row
+  highlight_best: true
+
+  # Add a summary paragraph after the table
+  include_summary: true

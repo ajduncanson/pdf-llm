@@ -20,22 +20,25 @@ class AnthropicProvider(BaseProvider):
         self.client = anthropic.Anthropic(api_key=api_key)
 
     def query_with_metadata(
-        self, prompt: str, context: str, model: str = None
+        self, prompt: str, context: str, model: str = None, system_prompt: str = None
     ) -> Tuple[str, Dict[str, Any]]:
         import anthropic
 
         model = model or self.default_model
+        kwargs = {
+            "model": model,
+            "max_tokens": 4096,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": f"Here are the documents:\n\n{context}\n\n{prompt}",
+                }
+            ],
+        }
+        if system_prompt:
+            kwargs["system"] = system_prompt
         try:
-            response = self.client.messages.create(
-                model=model,
-                max_tokens=4096,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": f"Here are the documents:\n\n{context}\n\n{prompt}",
-                    }
-                ],
-            )
+            response = self.client.messages.create(**kwargs)
         except anthropic.AuthenticationError:
             raise RuntimeError("Anthropic authentication failed — check your ANTHROPIC_API_KEY.")
         except anthropic.RateLimitError as e:
@@ -44,6 +47,11 @@ class AnthropicProvider(BaseProvider):
             )
         except anthropic.BadRequestError as e:
             raise RuntimeError(f"Anthropic rejected the request (bad request): {e}")
+        except anthropic.NotFoundError:
+            raise RuntimeError(
+                f"Model '{model}' was not found — it may have been retired or the ID is incorrect.\n"
+                f"Available models: claude-opus-4-8, claude-sonnet-4-6, claude-haiku-4-5"
+            )
         except anthropic.APIConnectionError as e:
             raise RuntimeError(f"Could not connect to Anthropic API: {e}")
         except anthropic.APIStatusError as e:

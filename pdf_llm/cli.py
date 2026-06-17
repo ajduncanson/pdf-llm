@@ -94,6 +94,10 @@ examples:
         "--top-k", type=int, default=5, metavar="N",
         help="Number of chunks to retrieve when using --rag (default: 5)",
     )
+    parser.add_argument(
+        "--pipeline-config", metavar="FILE",
+        help="YAML config file controlling feature priorities, comparison rules, and output format",
+    )
     return parser.parse_args()
 
 
@@ -126,6 +130,12 @@ def main():
 
     logger = _load_governance_logger()
 
+    system_prompt = None
+    if args.pipeline_config:
+        from .pipeline_config import load_system_prompt
+        system_prompt = load_system_prompt(args.pipeline_config)
+        print(f"Loaded pipeline config from {args.pipeline_config}")
+
     try:
         if args.rag:
             from .rag import run_rag
@@ -137,6 +147,7 @@ def main():
                 chunk_size=args.chunk_size,
                 top_k=args.top_k,
                 logger=logger,
+                system_prompt=system_prompt,
             )
         else:
             pipeline_start = time.monotonic()
@@ -168,7 +179,7 @@ def main():
 
             llm_start = time.monotonic()
             try:
-                response, llm_meta = provider.query_with_metadata(args.prompt, context, args.model)
+                response, llm_meta = provider.query_with_metadata(args.prompt, context, args.model, system_prompt)
             except RuntimeError as e:
                 total_ms = int((time.monotonic() - pipeline_start) * 1000)
                 if logger and entry:

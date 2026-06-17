@@ -5,5 +5,7 @@ services:
     volumes:
       - ./docs:/app/docs
       - ./logs:/app/logs
+      - ./config:/app/config
     # Pass arguments after the service name:
     #   docker compose run --rm pdf-llm --pdf docs/report.pdf --prompt "..." --provider anthropic
+    #   docker compose run --rm pdf-llm --pdf-dir docs --prompt "..." --provider anthropic --pipeline-config config/comparison_config.yaml

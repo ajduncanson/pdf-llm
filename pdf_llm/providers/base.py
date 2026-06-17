@@ -10,7 +10,7 @@ class BaseProvider(ABC):
 
     @abstractmethod
     def query_with_metadata(
-        self, prompt: str, context: str, model: str = None
+        self, prompt: str, context: str, model: str = None, system_prompt: str = None
     ) -> Tuple[str, Dict[str, Any]]:
         """
         Returns (response_text, metadata_dict).
@@ -18,7 +18,7 @@ class BaseProvider(ABC):
         """
         pass
 
-    def query(self, prompt: str, context: str, model: str = None) -> str:
+    def query(self, prompt: str, context: str, model: str = None, system_prompt: str = None) -> str:
         """Convenience wrapper — returns response text only."""
-        text, _ = self.query_with_metadata(prompt, context, model)
+        text, _ = self.query_with_metadata(prompt, context, model, system_prompt)
         return text

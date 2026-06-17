@@ -22,6 +22,7 @@ def run_rag(
     top_k: int = 10,
     logger: Optional["GovernanceLogger"] = None,
     session_id: Optional[str] = None,
+    system_prompt: Optional[str] = None,
 ) -> Tuple[str, Optional[str]]:
     """
     Returns (response_text, trace_id).
@@ -143,7 +144,7 @@ def run_rag(
     llm_start = time.monotonic()
     provider = PROVIDERS[provider_name]()
     try:
-        response_text, llm_meta = provider.query_with_metadata(prompt, context, model)
+        response_text, llm_meta = provider.query_with_metadata(prompt, context, model, system_prompt)
     except RuntimeError as e:
         total_ms = int((time.monotonic() - pipeline_start) * 1000)
         if logger and entry:

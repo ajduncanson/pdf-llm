@@ -53,10 +53,10 @@ GEMINI_API_KEY=AIza...
 
 **3. Create local folders**
 
-The container writes governance logs to `./logs/` and reads PDFs from wherever you point it. Create the logs folder so Docker can mount it:
+The container writes governance logs to `./logs/`, reads PDFs from `./docs/`, and reads pipeline configs from `./config/`. Create these folders so Docker can mount them:
 
 ```bash
-mkdir -p logs docs
+mkdir -p logs docs config
 ```
 
 **4. Build the Docker image**

@@ -20,20 +20,22 @@ class OpenAIProvider(BaseProvider):
         self.client = OpenAI(api_key=api_key)
 
     def query_with_metadata(
-        self, prompt: str, context: str, model: str = None
+        self, prompt: str, context: str, model: str = None, system_prompt: str = None
     ) -> Tuple[str, Dict[str, Any]]:
         import openai
 
         model = model or self.default_model
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({
+            "role": "user",
+            "content": f"Here are the documents:\n\n{context}\n\n{prompt}",
+        })
         try:
             response = self.client.chat.completions.create(
                 model=model,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": f"Here are the documents:\n\n{context}\n\n{prompt}",
-                    }
-                ],
+                messages=messages,
             )
         except openai.AuthenticationError:
             raise RuntimeError("OpenAI authentication failed — check your OPENAI_API_KEY.")
@@ -41,6 +43,11 @@ class OpenAIProvider(BaseProvider):
             raise RuntimeError(
                 f"OpenAI rate limit or quota exceeded. "
                 f"Check your usage at https://platform.openai.com/usage\nDetail: {e}"
+            )
+        except openai.NotFoundError:
+            raise RuntimeError(
+                f"Model '{model}' was not found — it may have been retired or the ID is incorrect.\n"
+                f"Common models: gpt-4o, gpt-4o-mini, o1, o3-mini"
             )
         except openai.BadRequestError as e:
             raise RuntimeError(f"OpenAI rejected the request (bad request): {e}")
